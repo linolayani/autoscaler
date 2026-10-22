@@ -1,0 +1,68 @@
+suite: cluster-autoscaler servicemonitor
+templates:
+  - servicemonitor.yaml
+tests:
+  - it: does not render a ServiceMonitor by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders scrape settings and omits empty relabelings
+    set:
+      serviceMonitor.enabled: true
+    asserts:
+      - equal:
+          path: kind
+          value: ServiceMonitor
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+      - equal:
+          path: spec.endpoints[0].port
+          value: http
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 10s
+      - equal:
+          path: spec.endpoints[0].path
+          value: /metrics
+      - equal:
+          path: spec.namespaceSelector.matchNames[0]
+          value: NAMESPACE
+      - notExists:
+          path: spec.endpoints[0].relabelings
+      - notExists:
+          path: spec.endpoints[0].metricRelabelings
+
+  - it: renders relabelings and metricRelabelings from list values
+    set:
+      serviceMonitor.enabled: true
+      serviceMonitor.namespace: observability
+      serviceMonitor.relabelings:
+        - sourceLabels:
+            - __meta_kubernetes_pod_node_name
+          targetLabel: node
+      serviceMonitor.metricRelabelings:
+        - action: drop
+          regex: go_.*
+          sourceLabels:
+            - __name__
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: observability
+      - equal:
+          path: spec.endpoints[0].relabelings[0].targetLabel
+          value: node
+      - equal:
+          path: spec.endpoints[0].relabelings[0].sourceLabels[0]
+          value: __meta_kubernetes_pod_node_name
+      - equal:
+          path: spec.endpoints[0].metricRelabelings[0].action
+          value: drop
+      - equal:
+          path: spec.endpoints[0].metricRelabelings[0].regex
+          value: go_.*
+      - equal:
+          path: spec.endpoints[0].metricRelabelings[0].sourceLabels[0]
+          value: __name__

@@ -443,6 +443,10 @@ vpa:
       memory: 50Mi
 ```
 
+## Testing
+
+This chart includes [helm-unittest](https://github.com/helm-unittest/helm-unittest) test suites under `tests/` that validate template rendering logic (cloud-provider command flags and ServiceMonitor relabelings). See [TESTING.md](./TESTING.md) for setup instructions, how to run the tests, and how to add new ones.
+
 ## Values
 
 | Key | Type | Default | Description |

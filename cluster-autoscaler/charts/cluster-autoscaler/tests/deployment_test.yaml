@@ -1,0 +1,97 @@
+suite: cluster-autoscaler deployment command
+templates:
+  - deployment.yaml
+tests:
+  - it: does not render a deployment without node groups or autodiscovery
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders AWS autodiscovery tags when autoDiscovery.clusterName is set
+    set:
+      autoDiscovery.clusterName: my-cluster
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: ./cluster-autoscaler
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --cloud-provider=aws
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --namespace=NAMESPACE
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/my-cluster
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.k8s.io/autoscaling/cluster-autoscaler:v1.35.0
+
+  - it: renders one --nodes flag per AWS autoscaling group
+    set:
+      autoscalingGroups:
+        - name: asg1
+          minSize: 1
+          maxSize: 10
+        - name: asg2
+          minSize: 0
+          maxSize: 4
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --cloud-provider=aws
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --nodes=1:10:asg1
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --nodes=0:4:asg2
+      - notContains:
+          path: spec.template.spec.containers[0].command
+          content: --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/my-cluster
+
+  - it: renders GCE MIG namePrefix discovery
+    set:
+      cloudProvider: gce
+      autoDiscovery.clusterName: my-cluster
+      autoscalingGroupsnamePrefix:
+        - name: ig01
+          minSize: 0
+          maxSize: 10
+        - name: "prefix-{{ .Release.Name }}"
+          minSize: 1
+          maxSize: 3
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --cloud-provider=gce
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --node-group-auto-discovery=mig:namePrefix=ig01,min=0,max=10
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --node-group-auto-discovery=mig:namePrefix=prefix-RELEASE-NAME,min=1,max=3
+      - notContains:
+          path: spec.template.spec.containers[0].command
+          content: --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/my-cluster
+
+  - it: renders OCI static node groups with the shared --nodes flag
+    set:
+      cloudProvider: oci
+      autoscalingGroups:
+        - name: pool-a
+          minSize: 1
+          maxSize: 5
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --cloud-provider=oci
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --nodes=1:5:pool-a
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: --namespace=NAMESPACE
+      - notContains:
+          path: spec.template.spec.containers[0].command
+          content: --node-group-auto-discovery=mig:namePrefix=
