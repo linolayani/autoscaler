@@ -5,6 +5,7 @@ on:
     paths:
       - 'vertical-pod-autoscaler/**'
       - '!vertical-pod-autoscaler/**/*.md'
+      - '!vertical-pod-autoscaler/charts/**'
 
 permissions:
   contents: read
